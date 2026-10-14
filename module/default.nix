@@ -8,12 +8,13 @@ let
   bundleLib = import ../lib.nix { inherit lib getSystem; };
 
   inherit (lib) types;
-  inherit (bundleLib) transpose withSystemExtraArgs;
+  inherit (bundleLib) transpose withSystemExtraArgs checkBundleRequirements;
 
   cfg = config.bundle;
 in
 {
   imports = map (module: import module bundleLib) [
+    ./auto-import.nix
     ./platforms.nix
     ./hosts.nix
     ./users.nix
@@ -108,7 +109,7 @@ in
             ++ mappedHomeModules
           ) usedHomePlatforms;
         in
-        {
+        checkBundleRequirements ([ sysBundle ] ++ lib.attrValues homeBundles) {
           inherit sysPlatform;
 
           args = {

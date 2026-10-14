@@ -53,7 +53,24 @@ let
           ) allPlatforms
         );
       }
-    ];
+      {
+        options._bundlix.requirements = lib.mkOption {
+          type = types.listOf (
+            types.submodule {
+              options = {
+                assertion = lib.mkOption { type = types.bool; };
+                message = lib.mkOption { type = types.str; };
+              };
+            }
+          );
+          default = [ ];
+          internal = true;
+          visible = false;
+          description = "Dependency checks evaluated after bundle configuration has merged";
+        };
+      }
+    ]
+    ++ cfg.autoImport.modules;
   };
 
   usersByHost = lib.mapAttrs (

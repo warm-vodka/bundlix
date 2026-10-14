@@ -16,6 +16,25 @@ let
         );
       };
 
+    mkOptionalBundles = import ./lib/optional-bundles.nix {
+      inherit lib;
+      inherit (bundleLib) mkEnableModule;
+    };
+
+    # Check fully merged bundles, not individual module definitions. This works
+    # for every platform and keeps disabled bundles' requirements inactive.
+    checkBundleRequirements =
+      bundles: value:
+      let
+        checks = lib.concatMap (bundle: bundle._bundlix.requirements) bundles;
+        failed = lib.filter (check: !check.assertion) checks;
+        messages = lib.unique (map (check: check.message) failed);
+      in
+      if failed == [ ] then
+        value
+      else
+        throw "bundle requirements failed:\n${lib.concatStringsSep "\n" messages}";
+
     transpose =
       let
         deconstruct = lib.mapAttrsToList (

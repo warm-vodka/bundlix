@@ -12,6 +12,7 @@ The coziest way to manage your nix config!
 - [User-centric configuration](#user-centric-configuration)
 - [Supported platforms](#supported-platforms)
 - [Getting started](#getting-started)
+- [Optional bundle auto-importing](#optional-bundle-auto-importing)
 
 ## The problem
 
@@ -196,3 +197,100 @@ Then add your configuration for each user, here's an example configuration:
 ```
 
 Based on your configuration, **bundle** will generate your hosts' configurations for you
+
+## Optional bundle auto-importing
+
+Auto-importing is opt-in. It discovers bundles and creates default-off enable
+options; it does not enable the bundles themselves.
+
+```nix
+{
+  bundle.autoImport = {
+    enable = true;
+    root = ./bundles;
+    prefix = [ "features" ];
+  };
+
+  bundle.users.diffy.hosts.sodium = {
+    features.programs.helix.enable = true;
+    features.programs.wakatime.enable = true;
+  };
+}
+```
+
+The root uses this layout:
+
+```text
+bundles/
+└── programs/
+    ├── helix/
+    │   ├── default.nix
+    │   └── helper.nix
+    └── wakatime/
+        └── default.nix
+```
+
+Only `<category>/<name>/default.nix` entry points are imported. Categories are
+inferred from directories directly under `root`; root-level files, sibling
+helpers, and directories without an entry point are ignored. Directory symlinks
+are not traversed, and entry points must be regular files.
+
+| Option | Default | Purpose |
+|---|---|---|
+| `bundle.autoImport.enable` | `false` | Enable discovery of optional bundles |
+| `bundle.autoImport.root` | `null` | Bundle root; required when discovery is enabled |
+| `bundle.autoImport.prefix` | `[ "bundles" ]` | Attribute path prepended to generated enable options |
+
+For example, `programs/helix/default.nix` with `prefix = [ "features" ]` creates
+`features.programs.helix.enable`. A prefix can have multiple segments or be empty.
+Keep it separate from platform namespaces and the internal `_bundlix` namespace.
+Generated flags belong to **bundle configuration**, not inside `nixos`,
+`darwin`, or `home-manager` configuration.
+
+All host and per-user bundle evaluations register these options. Set flags in
+`bundle.shared`, a user's `shared`, or a user's host configuration, using the
+same scoping rules as other bundle configuration.
+
+### Bundle contents and requirements
+
+An entry point contains platform configuration, either as an attribute set or
+as a function taking normal bundle arguments:
+
+```nix
+{ inputs', ... }:
+{
+  requires = [ "wakatime" ];
+  home-manager.programs.helix = {
+    enable = true;
+    extraPackages = [ inputs'.wakatime-ls.packages.default ];
+  };
+}
+```
+
+`requires` is optional wrapper metadata and must be a list of strings. Bare
+names refer to the same category; `"services.noctalia"` refers to another
+category discovered under `root`. Requirement checks use the same prefix as
+the generated enable options.
+
+Requirements never enable dependencies. An enabled bundle with a missing or
+disabled dependency fails evaluation and reports the required flag paths.
+Disabled bundles do not enforce their requirements. Checks run after bundle
+configuration has merged and apply to every system platform, not just NixOS.
+Each user's requirements must also be satisfied in that user's configuration;
+another user's flags cannot satisfy them.
+
+The wrapper manages the enable option and `requires` metadata. Entry points
+should return platform configuration, not their own top-level module
+`options`, `config`, or `imports`. Platform modules can still have their own
+imports, and sibling helper files can be imported explicitly from an entry.
+
+### Migrating from manual wrapping
+
+Enable `bundle.autoImport`, set the root, and set `prefix` to the attribute path
+used by your existing enable flags. Remove the manual import-tree mapping or
+`mkEnableModule` wrapping for those entries; auto-importing replaces that step.
+Keep imports for core configuration and host/user configuration.
+
+With auto-importing disabled, no root directory is read and manual imports work
+as before. The feature reuses the `lib` supplied by flake-parts and does not add
+flake inputs.
