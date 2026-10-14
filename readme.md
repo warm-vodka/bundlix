@@ -12,6 +12,7 @@ The coziest way to manage your nix config!
 - [User-centric configuration](#user-centric-configuration)
 - [Supported platforms](#supported-platforms)
 - [Getting started](#getting-started)
+- [Flake template](#flake-template)
 - [Optional bundle auto-importing](#optional-bundle-auto-importing)
 
 ## The problem
@@ -197,6 +198,31 @@ Then add your configuration for each user, here's an example configuration:
 ```
 
 Based on your configuration, **bundle** will generate your hosts' configurations for you
+
+## Flake template
+
+Initialize the default template in an empty directory:
+
+```sh
+nix flake init -t github:warm-vodka/bundlix#default
+```
+
+The template uses flake-parts, NixOS, and Home Manager. It enables optional bundle
+discovery under `bundles/` with the `features` prefix, includes a Git bundle, and
+registers a `demo` user and host. Run its headless VM with:
+
+```sh
+nix run .#nixosConfigurations.demo.config.system.build.vm
+```
+
+This is a demo VM, not an installer or a hardware configuration. Console
+autologin and passwordless sudo are enabled for convenience. Before adapting it
+to a real machine, replace the QEMU VM import in `hosts/demo.nix` with generated
+hardware configuration, review those login settings, and update the host/user
+names and architecture.
+
+Add bundles at `<category>/<name>/default.nix` and enable them from the host's
+bundle configuration with `features.<category>.<name>.enable`.
 
 ## Optional bundle auto-importing
 
