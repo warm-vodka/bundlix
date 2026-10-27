@@ -1,0 +1,1 @@
+throw "Non-Nix files must not be imported"

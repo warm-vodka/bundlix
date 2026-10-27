@@ -12,7 +12,7 @@ in
       type = types.nullOr types.path;
       default = null;
       example = lib.literalExpression "./bundles";
-      description = "Directory containing <category>/<name>/default.nix bundle entries. Required when auto-importing is enabled";
+      description = "Directory containing <category>/<name>/ bundle folders. All direct regular .nix files in each folder share its enable option. Required when auto-importing is enabled";
     };
 
     prefix = lib.mkOption {

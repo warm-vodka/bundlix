@@ -24,7 +24,7 @@
           nix run .#nixosConfigurations.demo.config.system.build.vm
           ```
 
-          Optional bundles live in `bundles/<category>/<name>/default.nix`.
+          Optional bundles live in `bundles/<category>/<name>/*.nix`.
           Set their `features.<category>.<name>.enable` flags in `hosts/demo.nix`.
 
           The demo VM uses console autologin and passwordless sudo. Replace its

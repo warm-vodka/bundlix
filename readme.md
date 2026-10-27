@@ -221,8 +221,8 @@ to a real machine, replace the QEMU VM import in `hosts/demo.nix` with generated
 hardware configuration, review those login settings, and update the host/user
 names and architecture.
 
-Add bundles at `<category>/<name>/default.nix` and enable them from the host's
-bundle configuration with `features.<category>.<name>.enable`.
+Add bundles at `<category>/<name>/*.nix` and enable the whole folder from the
+host's bundle configuration with `features.<category>.<name>.enable`.
 
 ## Optional bundle auto-importing
 
@@ -251,15 +251,17 @@ bundles/
 └── programs/
     ├── helix/
     │   ├── default.nix
-    │   └── helper.nix
+    │   └── keybindings.nix
     └── wakatime/
-        └── default.nix
+        ├── home.nix
+        └── system.nix
 ```
 
-Only `<category>/<name>/default.nix` entry points are imported. Categories are
-inferred from directories directly under `root`; root-level files, sibling
-helpers, and directories without an entry point are ignored. Directory symlinks
-are not traversed, and entry points must be regular files.
+All direct, regular `.nix` files in each `<category>/<name>/` folder are merged
+behind one enable option. `default.nix` is optional and is treated like any other
+file. Categories are inferred from directories directly under `root`; root-level
+files, non-Nix files, and bundle folders with no matching files are ignored.
+Nested directories and symlinks are not traversed or imported.
 
 | Option | Default | Purpose |
 |---|---|---|
@@ -267,7 +269,7 @@ are not traversed, and entry points must be regular files.
 | `bundle.autoImport.root` | `null` | Bundle root; required when discovery is enabled |
 | `bundle.autoImport.prefix` | `[ "bundles" ]` | Attribute path prepended to generated enable options |
 
-For example, `programs/helix/default.nix` with `prefix = [ "features" ]` creates
+For example, the files in `programs/helix/` with `prefix = [ "features" ]` share
 `features.programs.helix.enable`. A prefix can have multiple segments or be empty.
 Keep it separate from platform namespaces and the internal `_bundlix` namespace.
 Generated flags belong to **bundle configuration**, not inside `nixos`,
@@ -279,7 +281,7 @@ same scoping rules as other bundle configuration.
 
 ### Bundle contents and requirements
 
-An entry point contains platform configuration, either as an attribute set or
+Each `.nix` file contains platform configuration, either as an attribute set or
 as a function taking normal bundle arguments:
 
 ```nix
@@ -293,7 +295,8 @@ as a function taking normal bundle arguments:
 }
 ```
 
-`requires` is optional wrapper metadata and must be a list of strings. Bare
+`requires` is optional wrapper metadata in any bundle file and must be a list
+of strings. Requirements from all files apply when the folder is enabled. Bare
 names refer to the same category; `"services.noctalia"` refers to another
 category discovered under `root`. Requirement checks use the same prefix as
 the generated enable options.
@@ -305,10 +308,12 @@ configuration has merged and apply to every system platform, not just NixOS.
 Each user's requirements must also be satisfied in that user's configuration;
 another user's flags cannot satisfy them.
 
-The wrapper manages the enable option and `requires` metadata. Entry points
+The wrapper manages the enable option and `requires` metadata. Bundle files
 should return platform configuration, not their own top-level module
 `options`, `config`, or `imports`. Platform modules can still have their own
-imports, and sibling helper files can be imported explicitly from an entry.
+imports. Do not explicitly import sibling bundle files: they are already
+included automatically. Put helpers that are not bundle configuration in a
+nested directory and import them explicitly where needed.
 
 ### Migrating from manual wrapping
 
@@ -316,6 +321,10 @@ Enable `bundle.autoImport`, set the root, and set `prefix` to the attribute path
 used by your existing enable flags. Remove the manual import-tree mapping or
 `mkEnableModule` wrapping for those entries; auto-importing replaces that step.
 Keep imports for core configuration and host/user configuration.
+
+When migrating from default-only auto-importing, remove explicit imports of
+sibling `.nix` files to avoid applying them twice. Move non-bundle helper files
+into a nested directory.
 
 With auto-importing disabled, no root directory is read and manual imports work
 as before. The feature reuses the `lib` supplied by flake-parts and does not add

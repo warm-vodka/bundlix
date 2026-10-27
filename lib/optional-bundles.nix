@@ -5,8 +5,7 @@ let
     path: lib.attrNames (lib.filterAttrs (_: type: type == "directory") (builtins.readDir path));
   categories = directories root;
 
-  # Only <category>/<name>/default.nix entries are bundles. Sibling helper files
-  # and directories without an entry point are left alone.
+  # Every direct, regular .nix file belongs to its folder's optional bundle.
   discoverCategory =
     category:
     let
@@ -16,10 +15,14 @@ let
       name:
       let
         directory = categoryRoot + "/${name}";
-        entryType = (builtins.readDir directory)."default.nix" or null;
+        files = lib.attrNames (
+          lib.filterAttrs (name: type: type == "regular" && lib.hasSuffix ".nix" name) (
+            builtins.readDir directory
+          )
+        );
       in
-      lib.optional (entryType == "regular") {
-        file = directory + "/default.nix";
+      lib.optional (files != [ ]) {
+        files = map (file: directory + "/${file}") files;
         path = [
           category
           name
@@ -28,7 +31,7 @@ let
     ) (directories categoryRoot);
 
   wrapBundle =
-    { file, path }:
+    { files, path }:
     args@{ config, ... }:
     let
       category = builtins.head path;
@@ -97,14 +100,18 @@ let
             ];
           };
 
-      # Validate metadata even for a disabled bundle, before wrapping defers it.
-      makeOptional =
-        configuration: builtins.seq configuration (mkEnableModule (prefix ++ path) configuration);
+      configurations = map (
+        file:
+        lib.pipe (import file) [
+          evaluateBundle
+          prepareRequirements
+        ]
+      ) files;
     in
-    lib.pipe (import file) [
-      evaluateBundle
-      prepareRequirements
-      makeOptional
-    ];
+    # Validate every file's metadata even when disabled. Declare the enable
+    # option once, and merge all configurations under that shared gate.
+    builtins.seq (builtins.all (configuration: builtins.seq configuration true) configurations) (
+      mkEnableModule (prefix ++ path) (lib.mkMerge configurations)
+    );
 in
 map wrapBundle (lib.concatMap discoverCategory categories)
